@@ -1210,6 +1210,8 @@ std::string fit (const char* s, int n, bool right = false)
     const NSPoint p = [self convertPoint: [e locationInWindow] fromView: nil];
     if (! host) return;
     if (nameField) [self finishNaming: YES];
+    // the live values, even between timer ticks (the host may have just changed them)
+    for (int i = 0; i < kNumParams; ++i) shown[i] = host->getParam (i);
 
     if (NSPointInRect (p, kDrawerBtn)) { [self toggleDrawer]; return; }
 
