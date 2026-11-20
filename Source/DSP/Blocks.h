@@ -148,6 +148,9 @@ struct Biquad
     double b0, b1, b2, a1, a2, z1, z2;
     Biquad() : b0 (1), b1 (0), b2 (0), a1 (0), a2 (0), z1 (0), z2 (0) {}
     void reset() { z1 = z2 = 0.0; }
+    // Take another filter's coefficients but keep this one's own state (copying the
+    // whole struct would also overwrite the state, a jump in the signal)
+    void copyCoefs (const Biquad& o) { b0 = o.b0; b1 = o.b1; b2 = o.b2; a1 = o.a1; a2 = o.a2; }
     void setIdentity() { b0 = 1; b1 = b2 = a1 = a2 = 0; }
 
     inline double tick (double x)
@@ -218,9 +221,8 @@ struct Crossover
     Biquad l1, l2, h1, h2;
     void set (double f, double fs)
     {
-        l1.lowpass (f, 0.70710678, fs); l2 = l1;
-        h1.highpass (f, 0.70710678, fs); h2 = h1;
-        // keep state continuity: copying coefficients copied state too; that is fine
+        l1.lowpass (f, 0.70710678, fs); l2.copyCoefs (l1);
+        h1.highpass (f, 0.70710678, fs); h2.copyCoefs (h1);
     }
     void setKeep (double f, double fs)
     {
@@ -283,11 +285,11 @@ public:
         gR = std::sqrt (0.5 * (1.0 + 0.8 * s));
         // Behind: duller
         const double rear = c < 0 ? -c : 0.0;
-        rearL.highShelf (4000.0, -7.0 * rear, fs); rearR = rearL;
+        rearL.highShelf (4000.0, -7.0 * rear, fs); rearR.copyCoefs (rearL);
         // Elevation: above brightens around 7-8 kHz, below dulls; a notch that rises with height
         const double e = clampd (elevationDeg / 60.0, -1.0, 1.0);
         elL.peak (6500.0 + 3000.0 * e, 1.2, e > 0 ? 7.0 * e : 5.0 * e, fs);
-        elR = elL;
+        elR.copyCoefs (elL);
         // Crosstalk cancellation grows towards the sides and back
         xtalk = 0.55 * std::sqrt (far * 0.75 + rear * 0.25);
         xlLp.setLowpass (5000.0, fs); xrLp.setLowpass (5000.0, fs);

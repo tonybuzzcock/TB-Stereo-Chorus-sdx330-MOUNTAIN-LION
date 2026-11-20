@@ -69,6 +69,32 @@ static double freqOf (const std::vector<float>& x, size_t a, size_t b)
     return z > 1 ? (z - 1) * SR / (last - first) : 0.0;
 }
 
+
+// Median level (dB under the strongest bin below 3 kHz) of the 8-11 kHz band of a 4096-point
+// Hann spectrum: the floor any added grit would raise
+static double hfFloorDb (const std::vector<float>& x, size_t start)
+{
+    const int W = 4096;
+    double pk = 0.0;
+    std::vector<double> band;
+    for (int k = 1; k < W / 2; ++k)
+    {
+        const double f = k * SR / W;
+        if (! (f < 3000.0 || (f > 8000.0 && f < 11000.0))) continue;
+        double re = 0.0, im = 0.0;
+        for (int i = 0; i < W; ++i)
+        {
+            const double v = x[start + i] * (0.5 - 0.5 * std::cos (2.0 * kPi * i / W));
+            re += v * std::cos (2.0 * kPi * k * i / W);
+            im -= v * std::sin (2.0 * kPi * k * i / W);
+        }
+        const double m = std::sqrt (re * re + im * im);
+        if (f < 3000.0) pk = std::max (pk, m); else band.push_back (m);
+    }
+    std::sort (band.begin(), band.end());
+    return 20.0 * std::log10 (band[band.size() / 2] / (pk + 1e-30) + 1e-30);
+}
+
 static void program (Sdx330& u, int factoryIndex)
 {
     float v[kNumParams];
@@ -393,6 +419,31 @@ int main (int argc, char** argv)
         for (int i = N / 2; i < N; ++i) { sum += std::fabs (ol[i] + orr[i]); dif += std::fabs (ol[i] - orr[i]); }
         std::printf ("  Space Chorus mode 2: L+R %.3f, L-R %.3f\n", sum / (N / 2), dif / (N / 2));
         check (dif > 0.02 * sum && sum > dif, "Space Chorus widens a mono source and keeps a strong centre");
+    }
+
+
+    std::printf ("\nNo added grit: every program keeps a clean signal's high-frequency floor, both sides\n");
+    {
+        // A clean chord below 2 kHz (like an amp's speaker-simulated output)
+        std::vector<float> a (N), b (N), oa (N), ob (N);
+        const double fr[5] = { 196.0, 294.0, 650.0, 868.0, 1512.0 };
+        for (int i = 0; i < N; ++i)
+        {
+            double v = 0.0;
+            for (int k = 0; k < 5; ++k) v += 0.05 * std::sin (2.0 * kPi * fr[k] * i / SR);
+            a[i] = (float) v; b[i] = (float) (0.8 * v);
+        }
+        const double src = hfFloorDb (a, N / 2);
+        double worst = -300.0; int worstP = 0;
+        for (int k = 0; k < kNumFactory; ++k)
+        {
+            program (u, k);
+            run (u, a, b, oa, ob, 512);
+            const double fl = std::max (hfFloorDb (oa, N / 2), hfFloorDb (ob, N / 2));
+            if (fl > worst) { worst = fl; worstP = 201 + k; }
+        }
+        std::printf ("  source floor %.1f dB, worst program %d: %.1f dB\n", src, worstP, worst);
+        check (worst < -95.0, "no program raises the floor (this caught filter state copied between sides)");
     }
 
     std::printf ("\nStability sweep (random settings, every algorithm, loud noise and sines)\n");

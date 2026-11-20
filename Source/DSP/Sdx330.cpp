@@ -324,7 +324,7 @@ void Sdx330::updateControls()
         posL.setPosition (rp (kAzmtL), rp (kElevL));
         posR.setPosition (rp (kAzmtR), rp (kElevR));
     }
-    if (algo == kSpaceChorus) { spLpL.lowpass (kSpaceLpHz, 0.6, fs); spLpR = spLpL; }
+    if (algo == kSpaceChorus) { spLpL.lowpass (kSpaceLpHz, 0.6, fs); spLpR.copyCoefs (spLpL); }
     if (algo == kEnsemble)
     {
         const double* m = kEnsModes[modeFor (kEnsemble, prm[kMode])];
@@ -344,7 +344,7 @@ void Sdx330::updateControls()
     {
         const int cf = ip (kChFil), af = ip (kAmFil);
         if (cf == 1) chFilL.lowpass (rp (kChFrq), 0.7, fs); else if (cf == 2) chFilL.highpass (rp (kChFrq), 0.7, fs); else chFilL.setIdentity();
-        chFilR.b0 = chFilL.b0; chFilR.b1 = chFilL.b1; chFilR.b2 = chFilL.b2; chFilR.a1 = chFilL.a1; chFilR.a2 = chFilL.a2;
+        chFilR.copyCoefs (chFilL);
         if (af == 1) amFil.lowpass (rp (kAmFrq), 0.7, fs); else if (af == 2) amFil.highpass (rp (kAmFrq), 0.7, fs); else amFil.setIdentity();
         // Decay 1..30 -> RT60 0.1 .. 3.0 s; HF damp -100..0 -> loop low-pass 1 kHz .. 20 kHz (estimates)
         const double rt = 0.1 * rp (kAmDcy);
