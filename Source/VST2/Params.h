@@ -340,7 +340,8 @@ inline void formatReal (int p, double r, char* out, int size)
             break;
         }
         case uHz:
-            if (r >= 1000.0)      std::snprintf (b, sizeof (b), r >= 10000.0 ? "%.1fk" : "%.2fk", r / 1000.0);
+            // decide on the rounded value, so 999.7 shows 1.00k and 9999 shows 10.0k
+            if (r >= (i.decimals ? 999.995 : 999.5)) std::snprintf (b, sizeof (b), r >= 9995.0 ? "%.1fk" : "%.2fk", r / 1000.0);
             else if (i.decimals)  std::snprintf (b, sizeof (b), "%.*f", i.decimals, r);
             else                  std::snprintf (b, sizeof (b), "%.0f", r);
             break;
